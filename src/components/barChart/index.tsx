@@ -19,18 +19,20 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
   const perHourUsage = variableData?.filter((item) => item?.variable === "perhourusage") || [];
 
   const mockDataPerHourUsage = perHourUsage.map((item) => {
-    const timeMoment = moment(item?.time).format("yyyy-MM-dd HH:mm:ss");
+    const timeMoment = moment(item?.time).tz("America/Sao_Paulo").format("YYYY-MM-DD HH:mm:ss");
     return {
       value: item.value,
-      time: timeMoment, // Formata a hora usando Luxon
+      time: timeMoment,
     };
   });
 
+  console.log("mockDataPerHourUsage", mockDataPerHourUsage);
+
   const mockDataDailyConsumption = dailyConsumption.map((item) => {
-    const timeMoment = moment(item?.time).format("yyyy-MM-dd HH:mm:ss");
+    const timeMoment = moment(item?.time).format("YYYY-MM-DD HH:mm:ss");
     return {
       value: item.value,
-      time: timeMoment, // Formata a hora usando Luxon
+      time: timeMoment,
     };
   });
 
@@ -47,7 +49,7 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
     plotOptions: {
       bar: {
         horizontal: false,
-        columnWidth: 7,
+        columnWidth: "100%",
       },
     },
     xaxis: {
@@ -56,12 +58,7 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
         ? mockDataPerHourUsage.map((item) => item.time)
         : mockDataDailyConsumption.map((item) => item.time), // Valores formatados para o eixo X
       labels: {
-        datetimeFormatter: {
-          year: "yyyy",
-          month: "MMM 'yy",
-          day: "dd MMM",
-          hour: "HH:mm",
-        },
+        datetimeUTC: false, // Desativa a conversão automática para UTC
       },
     },
     tooltip: {
@@ -69,7 +66,7 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
         format: "dd/MM/yyyy HH:mm", // Formatação para a tooltip
       },
       y: {
-        formatter: (value: number) => `${value.toFixed(2)}`, // Formatação para os valores
+        formatter: (value: number) => `${value}`, // Formatação para os valores
       },
     },
     yaxis: {
@@ -95,8 +92,8 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
     {
       name: isPerHourUsage ? "perhourusage" : "daily_consumption",
       data: isPerHourUsage
-        ? mockDataPerHourUsage.map((item) => item.value)
-        : mockDataDailyConsumption.map((item) => item.value), // Valores formatados para o eixo Y
+        ? mockDataPerHourUsage.map((item) => item.value / 100)
+        : mockDataDailyConsumption.map((item) => item.value / 100), // Valores formatados para o eixo Y
     },
   ];
 
