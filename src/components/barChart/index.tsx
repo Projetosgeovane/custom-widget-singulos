@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 import moment from "moment-timezone";
-import { Box } from "@mui/material";
+import { Box, Button, ButtonGroup } from "@mui/material";
 
 type WidgetProps = {
   data: WidgetData[] | null;
@@ -11,6 +11,8 @@ type WidgetProps = {
 };
 
 export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: WidgetProps) {
+  const [filterDays, setFilterDays] = useState(15);
+
   const variableData = useMemo(() => {
     return data?.find((item) => item)?.result || [];
   }, [data]) as any;
@@ -18,38 +20,32 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
   const dailyConsumption = variableData?.filter((item) => item?.variable === "daily_consumption") || [];
   const perHourUsage = variableData?.filter((item) => item?.variable === "perhourusage") || [];
 
-  const mockDataPerHourUsage = perHourUsage.map((item) => {
-    const timeMoment = moment(item?.time).tz("America/Sao_Paulo").format("YYYY-MM-DD HH:mm:ss");
-    return {
-      value: item.value,
-      time: timeMoment,
-    };
-  });
-
-  console.log("mockDataPerHourUsage", mockDataPerHourUsage);
-
+  // Dados de consumo diário formatados com timestamps
   const mockDataDailyConsumption = dailyConsumption.map((item) => {
-    const timeMoment = moment(item?.time).format("YYYY-MM-DD HH:mm:ss");
     return {
+      time: moment(item?.time).valueOf(),
       value: item.value,
-      time: timeMoment,
     };
   });
 
-  // Agrupar e somar os valores por dia
+  // Agrupar e somar os valores por dia para consumo por hora
   const dailySums = perHourUsage.reduce((acc: Record<string, number>, item: any) => {
-    const day = moment(item.time).format("YYYY-MM-DD"); // Extrai apenas o dia
-    acc[day] = (acc[day] || 0) + item.value; // Soma os valores para cada dia
+    const day = moment(item.time).format("YYYY-MM-DD");
+    acc[day] = (acc[day] || 0) + item.value;
     return acc;
   }, {});
 
-  // Formata os dados para o gráfico, transformando o objeto `dailySums` em um array
+  // Formata os dados para o gráfico, transformando o objeto `dailySums` em um array com timestamps
   const formattedDailyData = Object.keys(dailySums).map((day) => ({
-    time: day,
-    value: dailySums[day] / 100, // Ajusta a unidade de valor
+    time: new Date(day).getTime(),
+    value: dailySums[day] / 100,
   }));
 
-  console.log("formattedDailyData", formattedDailyData);
+  // Calcula os limites do eixo X com base no filtro
+  const minDate = filterDays
+    ? moment().subtract(filterDays, "days").startOf("day").valueOf()
+    : Math.min(...[...mockDataDailyConsumption, ...formattedDailyData].map((item) => item.time)); // Mostra desde o primeiro registro disponível quando não há filtro
+  const maxDate = moment().endOf("day").valueOf();
 
   const options = {
     chart: {
@@ -69,23 +65,25 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
     },
     xaxis: {
       type: "datetime",
-      categories: formattedDailyData.map((item) => item.time), // Datas formatadas para o eixo X
-      // labels: {
-      //   datetimeUTC: false,
-      // },
+      categories: isPerHourUsage
+        ? formattedDailyData.map((item) => item.time) // Agrupado por dia em timestamps
+        : mockDataDailyConsumption.map((item) => item.time), // Consumo direto em timestamps
+      min: minDate, // Define o limite mínimo com base no filtro
+      max: maxDate,
     },
     tooltip: {
       x: {
-        format: "dd/MM/yyyy", // Formatação para a tooltip
+        format: "dd/MM/yyyy",
       },
       y: {
-        formatter: (value: number) => `${value}`, // Formatação para os valores
+        formatter: (value: number) => `${value}`,
       },
     },
     yaxis: {
       title: {
-        text: "Usage",
+        text: "Consumo Diário (m³)",
       },
+      min: 0,
     },
     dataLabels: {
       enabled: false,
@@ -97,74 +95,39 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
 
   const series = [
     {
-      name: "Consumption Per Day",
-      data: formattedDailyData.map((item) => item.value), // Valores formatados para o eixo Y
+      name: isPerHourUsage ? "Consumo por Dia" : "Consumo Direto",
+      data: isPerHourUsage
+        ? formattedDailyData.map((item) => ({ x: item.time, y: item.value }))
+        : mockDataDailyConsumption.map((item) => ({ x: item.time, y: item.value })),
     },
   ];
 
-  // const options = {
-  //   chart: {
-  //     type: "bar",
-  //     zoom: {
-  //       enabled: true,
-  //     },
-  //     toolbar: {
-  //       show: true,
-  //     },
-  //   },
-  //   plotOptions: {
-  //     bar: {
-  //       horizontal: false,
-  //       columnWidth: "100%",
-  //     },
-  //   },
-  //   xaxis: {
-  //     type: "datetime", // Necessário para reconhecer as datas corretamente
-  //     categories: isPerHourUsage
-  //       ? mockDataPerHourUsage.map((item) => item.time)
-  //       : mockDataDailyConsumption.map((item) => item.time), // Valores formatados para o eixo X
-  //     labels: {
-  //       datetimeUTC: false, // Desativa a conversão automática para UTC
-  //     },
-  //   },
-  //   tooltip: {
-  //     x: {
-  //       format: "dd/MM/yyyy HH:mm", // Formatação para a tooltip
-  //     },
-  //     y: {
-  //       formatter: (value: number) => `${value}`, // Formatação para os valores
-  //     },
-  //   },
-  //   yaxis: {
-  //     title: {
-  //       text: "Usage",
-  //     },
-  //   },
-  //   dataLabels: {
-  //     enabled: false,
-  //   },
-  //   grid: {
-  //     borderColor: "#f1f1f1",
-  //   },
-  // };
-
-  // // const series = [
-  // //   {
-  // //     name: "perhourusage",
-  // //     data: mockData.map((item) => item.value), // Valores formatados para o eixo Y
-  // //   },
-  // // ];
-  // const series = [
-  //   {
-  //     name: isPerHourUsage ? "perhourusage" : "daily_consumption",
-  //     data: isPerHourUsage
-  //       ? mockDataPerHourUsage.map((item) => item.value / 100)
-  //       : mockDataDailyConsumption.map((item) => item.value / 100), // Valores formatados para o eixo Y
-  //   },
-  // ];
-
+  // Função para alterar o filtro de dias
+  const handleFilterChange = (days) => {
+    setFilterDays(days);
+  };
   return (
     <Box width="100%" height="400px">
+      <Box display="flex" justifyContent="center" mb={1} mt={1}>
+        <ButtonGroup variant="outlined" color="primary">
+          <Button onClick={() => handleFilterChange(null)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+            TODO O PERÍODO
+          </Button>
+          <Button onClick={() => handleFilterChange(90)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+            1 ANO
+          </Button>
+          <Button onClick={() => handleFilterChange(90)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+            6 MESES
+          </Button>
+          <Button onClick={() => handleFilterChange(30)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+            1 MÊS
+          </Button>
+          <Button onClick={() => handleFilterChange(15)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+            15 DIAS
+          </Button>
+        </ButtonGroup>
+      </Box>
+
       <Chart options={options} series={series} type="bar" height="350" />
     </Box>
   );
