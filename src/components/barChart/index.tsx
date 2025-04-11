@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 import moment from "moment-timezone";
-import { Box, Button, ButtonGroup } from "@mui/material";
+import { Box, Button, ButtonGroup, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 
 type WidgetProps = {
   data: WidgetData[] | null;
@@ -10,23 +10,41 @@ type WidgetProps = {
   isPerHourUsage: any;
 };
 
-export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: WidgetProps) {
+interface DataItem {
+  variable: string;
+  time: string;
+  value: number;
+}
+
+export default function EquipmentDetailsWidgetChart({ data }: WidgetProps) {
   const [filterDays, setFilterDays] = useState(15);
+  const [viewMode, setViewMode] = useState("daily");
 
   const variableData = useMemo(() => {
     return data?.find((item) => item)?.result || [];
-  }, [data]) as any;
+  }, [data]) as DataItem[];
 
-  const dailyConsumption = variableData?.filter((item) => item?.variable === "daily_consumption") || [];
-  const perHourUsage = variableData?.filter((item) => item?.variable === "perhourusage") || [];
+  // Filtra duplicatas mantendo apenas o primeiro registro para cada timestamp
+  const perHourUsage = useMemo(() => {
+    const uniqueTimestamps = new Map<number, DataItem>();
 
-  // Dados de consumo diário formatados com timestamps
-  const mockDataDailyConsumption = dailyConsumption.map((item) => {
-    return {
-      time: moment(item?.time).valueOf(),
-      value: item.value,
-    };
-  });
+    const hourUsageData = variableData.filter((item) => item.variable === "perhourusage");
+
+    hourUsageData.forEach((item) => {
+      const timestamp = moment(item.time).valueOf();
+      if (!uniqueTimestamps.has(timestamp)) {
+        uniqueTimestamps.set(timestamp, item);
+      }
+    });
+
+    return Array.from(uniqueTimestamps.values());
+  }, [variableData]);
+
+  // Dados de consumo Horário formatados com timestamps
+  const mockDataPerHourUsage = perHourUsage.map((item) => ({
+    time: moment(item.time).valueOf(),
+    value: item.value / 100,
+  }));
 
   // Agrupar e somar os valores por dia para consumo por hora
   const dailySums = perHourUsage.reduce((acc: Record<string, number>, item: any) => {
@@ -44,12 +62,12 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
   // Calcula os limites do eixo X com base no filtro
   const minDate = filterDays
     ? moment().subtract(filterDays, "days").startOf("day").valueOf()
-    : Math.min(...[...mockDataDailyConsumption, ...formattedDailyData].map((item) => item.time)); // Mostra desde o primeiro registro disponível quando não há filtro
+    : Math.min(...[...mockDataPerHourUsage, ...formattedDailyData].map((item) => item.time)); // Mostra desde o primeiro registro disponível quando não há filtro
   const maxDate = moment().endOf("day").valueOf();
 
   const options = {
     chart: {
-      type: "bar",
+      type: "bar" as const,
       zoom: {
         enabled: true,
       },
@@ -64,16 +82,17 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
       },
     },
     xaxis: {
-      type: "datetime",
-      categories: isPerHourUsage
-        ? formattedDailyData.map((item) => item.time) // Agrupado por dia em timestamps
-        : mockDataDailyConsumption.map((item) => item.time), // Consumo direto em timestamps
-      min: minDate, // Define o limite mínimo com base no filtro
+      type: "datetime" as const,
+      categories:
+        viewMode === "daily"
+          ? formattedDailyData.map((item) => item.time)
+          : mockDataPerHourUsage.map((item) => item.time),
+      min: minDate,
       max: maxDate,
     },
     tooltip: {
       x: {
-        format: "dd/MM/yyyy",
+        format: viewMode === "daily" ? "dd/MM/yyyy" : "dd/MM/yyyy HH:mm",
       },
       y: {
         formatter: (value: number) => `${value}`,
@@ -81,7 +100,7 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
     },
     yaxis: {
       title: {
-        text: "Consumo Diário (m³)",
+        text: viewMode === "hourly" ? "Consumo Horário (m³)" : "Consumo Diário (m³)",
       },
       min: 0,
     },
@@ -95,10 +114,11 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
 
   const series = [
     {
-      name: isPerHourUsage ? "Consumo por Dia" : "Consumo Direto",
-      data: isPerHourUsage
-        ? formattedDailyData.map((item) => ({ x: item.time, y: item.value }))
-        : mockDataDailyConsumption.map((item) => ({ x: item.time, y: item.value })),
+      name: viewMode === "hourly" ? "Consumo Horário (m³)" : "Consumo Diário (m³)",
+      data:
+        viewMode === "daily"
+          ? formattedDailyData.map((item) => ({ x: item.time, y: item.value }))
+          : mockDataPerHourUsage.map((item) => ({ x: item.time, y: item.value })),
     },
   ];
 
@@ -106,24 +126,53 @@ export default function EquipmentDetailsWidgetChart({ data, isPerHourUsage }: Wi
   const handleFilterChange = (days) => {
     setFilterDays(days);
   };
+
   return (
     <Box width="100%" height="400px">
-      <Box display="flex" justifyContent="center" mb={1} mt={1}>
-        <ButtonGroup variant="outlined" color="primary">
-          <Button onClick={() => handleFilterChange(null)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
-            TODO O PERÍODO
+      <Box display="flex" justifyContent="space-between" alignItems="center" margin="10px 15px">
+        <FormControl variant="outlined" size="small" sx={{ minWidth: 120, padding: 0 }}>
+          <InputLabel id="view-mode-label">Visualização</InputLabel>
+          <Select
+            labelId="view-mode-label"
+            value={viewMode}
+            onChange={(e) => setViewMode(e.target.value)}
+            label="Visualização"
+          >
+            <MenuItem value="daily">Consumo Diário</MenuItem>
+            <MenuItem value="hourly">Consumo Horário</MenuItem>
+          </Select>
+        </FormControl>
+
+        <ButtonGroup variant="outlined" size="small" color="primary">
+          <Button
+            onClick={() => handleFilterChange(null)}
+            sx={{ padding: "2px 30px", whiteSpace: "nowrap", fontSize: "0.75rem" }}
+          >
+            TODO PERÍODO
           </Button>
-          <Button onClick={() => handleFilterChange(90)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+          <Button
+            onClick={() => handleFilterChange(365)}
+            sx={{ padding: "2px 6px", whiteSpace: "nowrap", fontSize: "0.75rem" }}
+          >
             1 ANO
           </Button>
-          <Button onClick={() => handleFilterChange(90)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+          <Button
+            onClick={() => handleFilterChange(90)}
+            sx={{ padding: "2px 6px", whiteSpace: "nowrap", fontSize: "0.75rem" }}
+          >
             6 MESES
           </Button>
-          <Button onClick={() => handleFilterChange(30)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
+          <Button
+            onClick={() => handleFilterChange(30)}
+            sx={{ padding: "2px 6px", whiteSpace: "nowrap", fontSize: "0.75rem" }}
+          >
             1 MÊS
           </Button>
-          <Button onClick={() => handleFilterChange(15)} size="small" sx={{ padding: "4px 8px", fontSize: "0.8rem" }}>
-            15 DIAS
+          <Button
+            onClick={() => handleFilterChange(15)}
+            sx={{ padding: "2px 6px", whiteSpace: "nowrap", fontSize: "0.75rem" }}
+          >
+            15 dias
           </Button>
         </ButtonGroup>
       </Box>

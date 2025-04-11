@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 
 import "./Widget.css";
 import EquipmentDetailsWidgetChart from "./components/barChart";
+import DailyConsumptionWidgetChart from "./components/chartDailyConsumption";
 
 type WidgetProps = {
   /**
@@ -32,12 +33,21 @@ type WidgetProps = {
 };
 
 function Widget(props: WidgetProps) {
-  const { data, showTime, userSettings, isPerHourUsage } = props;
-  return (
-    <Box width={"100%"} height="300px">
-      <EquipmentDetailsWidgetChart data={data} isPerHourUsage={isPerHourUsage} />
-    </Box>
-  );
+  const { data, isPerHourUsage } = props;
+
+  if (isPerHourUsage) {
+    return (
+      <Box width={"100%"} height="300px">
+        <EquipmentDetailsWidgetChart data={data} isPerHourUsage={isPerHourUsage} />
+      </Box>
+    );
+  } else {
+    return (
+      <Box width={"100%"} height="300px">
+        <DailyConsumptionWidgetChart data={data} />
+      </Box>
+    );
+  }
 }
 
 export { Widget };

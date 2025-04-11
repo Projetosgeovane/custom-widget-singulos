@@ -37,7 +37,6 @@ function WidgetView() {
     // the data has changed before updating the state to avoid re-rendering unnecessarily.
     window.TagoIO.onRealtime((data) => {
       const isPerHourUsage = data?.[1]?.result?.[0]?.tags?.some((item) => item?.key === "is_per_hour_usage");
-      console.log(data?.[1]?.result?.[0]);
       setData(data);
       setPerHourUsage(isPerHourUsage);
     });
@@ -55,56 +54,9 @@ function WidgetView() {
 export { WidgetView };
 
 /**
- * Example of Handle sending data to the API.
- */
-// async function handleSendData(valueToSend) {
-//   const targetVariable = getVariableByKey(variable);
-
-//   if (!targetVariable) {
-//     return;
-//   }
-
-//   const {
-//     variable: variableName,
-//     origin: { id: deviceId },
-//   } = targetVariable;
-
-//   const payload = {
-//     variable: variableName,
-//     origin: deviceId,
-//     value: valueToSend,
-//   };
-
-//   window.TagoIO.sendData(payload, (response) => {
-//     if (!response) {
-//       console.error("Error sending data!");
-//     }
-
-//     if (response.status) {
-//       console.log("Data sent successfully!");
-//     } else {
-//       console.log(response.message);
-//     }
-//   });
-// }
-
-/**
  * Get a variable from the widget's display variables by using the variable key (see `getVariableKey`) as identifier.
  *
  * @param variableKey Key from the options.
  *
  * @returns Variable object from the widget's display or `null` if it couldn't be found.
  */
-// function getVariableByKey(variableKey: string | null) {
-//   const [originId, variableName] = (variableKey || "").split("-");
-
-//   if (originId && variableName) {
-//     return (
-//       widget.display.variables.find(
-//         (variable) => variable.variable === variableName && variable.origin.id === originId
-//       ) || null
-//     );
-//   }
-
-//   return null;
-// }
