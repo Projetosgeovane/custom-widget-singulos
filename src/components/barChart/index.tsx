@@ -20,6 +20,12 @@ export default function EquipmentDetailsWidgetChart({ data }: WidgetProps) {
   const [filterDays, setFilterDays] = useState(15);
   const [viewMode, setViewMode] = useState("daily");
 
+  // Ajusta o filtro padrão quando o modo de visualização muda
+  const handleViewModeChange = (mode: string) => {
+    setViewMode(mode);
+    setFilterDays(mode === "hourly" ? 7 : 15);
+  };
+
   const variableData = useMemo(() => {
     return data?.find((item) => item)?.result || [];
   }, [data]) as DataItem[];
@@ -30,7 +36,14 @@ export default function EquipmentDetailsWidgetChart({ data }: WidgetProps) {
 
     const hourUsageData = variableData.filter((item) => item.variable === "perhourusage");
 
-    hourUsageData.forEach((item) => {
+    // Aplica o filtro de dias tanto para modo diário quanto horário
+    const filteredData = filterDays
+      ? hourUsageData.filter((item) =>
+        moment(item.time).isAfter(moment().subtract(filterDays, "days"))
+      )
+      : hourUsageData;
+
+    filteredData.forEach((item) => {
       const timestamp = moment(item.time).valueOf();
       if (!uniqueTimestamps.has(timestamp)) {
         uniqueTimestamps.set(timestamp, item);
@@ -38,7 +51,7 @@ export default function EquipmentDetailsWidgetChart({ data }: WidgetProps) {
     });
 
     return Array.from(uniqueTimestamps.values());
-  }, [variableData]);
+  }, [variableData, filterDays]);
 
   // Dados de consumo Horário formatados com timestamps
   const mockDataPerHourUsage = perHourUsage.map((item) => ({
@@ -135,7 +148,7 @@ export default function EquipmentDetailsWidgetChart({ data }: WidgetProps) {
           <Select
             labelId="view-mode-label"
             value={viewMode}
-            onChange={(e) => setViewMode(e.target.value)}
+            onChange={(e) => handleViewModeChange(e.target.value)}
             label="Visualização"
           >
             <MenuItem value="daily">Consumo Diário</MenuItem>
